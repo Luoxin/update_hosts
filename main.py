@@ -82,7 +82,7 @@ def update_domain(domain, hosts_path=""):
     hosts.write()
 
 
-def main(domain_list: "github.com", y=False):
+def main(domain_list="github.com", y: bool = False):
     def is_admin():
         try:
             return ctypes.windll.shell32.IsUserAnAdmin()
