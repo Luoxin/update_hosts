@@ -113,7 +113,7 @@ def main(
         print("invalid domain_list")
 
     print(
-        "will check and update domains {}[y/N]".format(" ".join(domain_list)), end=":"
+        "will check and update domains: {}[y/N]".format(" ".join(domain_list)), end=":"
     )
 
     if not y:
