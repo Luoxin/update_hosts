@@ -82,7 +82,7 @@ def update_domain(domain, hosts_path=""):
     hosts.write()
 
 
-def main(domain_list: list = ["github.com"], y=False):
+def main(domain_list: "github.com", y=False):
     def is_admin():
         try:
             return ctypes.windll.shell32.IsUserAnAdmin()
@@ -90,10 +90,15 @@ def main(domain_list: list = ["github.com"], y=False):
             return False
 
     if is_admin():
-        domain_list = domain_list.replace(" ", "").split(",")
-        if len(domain_list) == 0:
-            print("can not find domains")
-            return
+        if isinstance(domain_list, str):
+            domain_list = domain_list.replace(" ", "").split(",")
+            if len(domain_list) == 0:
+                print("can not find domains")
+                return
+        elif isinstance(domain_list, (list, tuple, set)):
+            pass
+        else:
+            print("invalid domain_list")
 
         print("will check and update domains {}[y/N]".format(" ".join(domain_list)))
 
