@@ -1,0 +1,4 @@
+dnspython~=1.16.0
+ping3~=2.6.1
+tqdm~=4.42.1
+fire~=0.3.1
