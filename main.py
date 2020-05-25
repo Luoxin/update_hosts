@@ -82,7 +82,26 @@ def update_domain(domain, hosts_path=""):
     hosts.write()
 
 
-def main(domain_list="github.com", y: bool = False):
+def main(
+    domain_list=None, y: bool = False,
+):
+    if domain_list is None:
+        domain_list = [
+            "github.githubassets.com",
+            "camo.githubusercontent.com",
+            "github.map.fastly.net",
+            "github.global.ssl.fastly.net",
+            "github.com",
+            "api.github.com",
+            "raw.githubusercontent.com",
+            "avatars5.githubusercontent.com",
+            "avatars4.githubusercontent.com",
+            "avatars3.githubusercontent.com",
+            "avatars2.githubusercontent.com",
+            "avatars1.githubusercontent.com",
+            "avatars0.githubusercontent.com",
+        ]
+
     if isinstance(domain_list, str):
         domain_list = domain_list.replace(" ", "").split(",")
         if len(domain_list) == 0:
