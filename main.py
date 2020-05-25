@@ -93,7 +93,9 @@ def main(domain_list="github.com", y: bool = False):
     else:
         print("invalid domain_list")
 
-    print("will check and update domains {}[y/N]".format(" ".join(domain_list)), end=":")
+    print(
+        "will check and update domains {}[y/N]".format(" ".join(domain_list)), end=":"
+    )
 
     if not y:
         y = input()
