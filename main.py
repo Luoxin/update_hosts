@@ -16,7 +16,7 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     hosts.remove_all_matching(name=domain)
     entry_list = []
 
-    for ip in tqdm(ip_list, desc="正在写入hosts"):
+    for ip in tqdm(ip_list, desc="write hosts"):
         entry_list.append(HostsEntry(entry_type="ipv4", address=ip, names=[domain]))
 
     hosts.add(entry_list)
@@ -28,7 +28,7 @@ def dns_query(dns_server, domain):
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [dns_server]
 
-        A = resolver.query(domain, lifetime=300)
+        A = resolver.query(domain, lifetime=3)
         for i in A.response.answer:
             for j in i.items:
                 ip_list.append(j)
@@ -44,13 +44,13 @@ def dns_query_all(domain) -> (set, list):
     ip_pool_dns = set()
     ip_pool = set()
     for dns_server in tqdm(
-        dns_service_list, ncols=100, desc="正在进行dns查询 {}".format(domain)
+        dns_service_list, ncols=100, desc="dns query {}".format(domain)
     ):
         for ip in dns_query(dns_server, domain):
             ip_pool_dns.add(ip.__str__())
 
-    for ip in tqdm(ip_pool_dns, ncols=100, desc="正在检测连通性 {}".format(domain)):
-        if ping(ip, unit="ms", timeout=5) is not None:
+    for ip in tqdm(ip_pool_dns, ncols=100, desc="ping {}".format(domain)):
+        if ping(ip, unit="ms", timeout=3) is not None:
             ip_pool.add(ip)
 
     return ip_pool
@@ -83,34 +83,25 @@ def update_domain(domain, hosts_path=""):
 
 
 def main(domain_list="github.com", y: bool = False):
-    def is_admin():
-        try:
-            return ctypes.windll.shell32.IsUserAnAdmin()
-        except:
-            return False
-
-    if is_admin():
-        if isinstance(domain_list, str):
-            domain_list = domain_list.replace(" ", "").split(",")
-            if len(domain_list) == 0:
-                print("can not find domains")
-                return
-        elif isinstance(domain_list, (list, tuple, set)):
-            pass
-        else:
-            print("invalid domain_list")
-
-        print("will check and update domains {}[y/N]".format(" ".join(domain_list)))
-
-        if not y:
-            y = input()
-            if y.lower() != "y":
-                return
-
-        for domain in domain_list:
-            update_domain(domain)
+    if isinstance(domain_list, str):
+        domain_list = domain_list.replace(" ", "").split(",")
+        if len(domain_list) == 0:
+            print("can not find domains")
+            return
+    elif isinstance(domain_list, (list, tuple, set)):
+        pass
     else:
-        print("please run with admin")
+        print("invalid domain_list")
+
+    print("will check and update domains {}[y/N]".format(" ".join(domain_list)), end=":")
+
+    if not y:
+        y = input()
+        if y.lower() != "y":
+            return
+
+    for domain in domain_list:
+        update_domain(domain)
 
 
 if __name__ == "__main__":
