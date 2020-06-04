@@ -122,6 +122,7 @@ def main(
             return
 
     for domain in domain_list:
+        print("check domain {}".format(domain))
         update_domain(domain)
 
 
