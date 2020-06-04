@@ -1,23 +1,30 @@
-from __future__ import print_function
-
-import ctypes
 import sys
-
+import traceback
 import dns.resolver
 import fire
 from ping3 import ping
-from python_hosts import Hosts, HostsEntry
+from python_hosts import Hosts, HostsEntry, is_ipv4, is_ipv6
 from tqdm import tqdm
 
 from dns_list import dns_service_list
 
 
 def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
+    if len(ip_list) == 0:
+        return
+
     hosts.remove_all_matching(name=domain)
     entry_list = []
 
     for ip in tqdm(ip_list, desc="write hosts"):
-        entry_list.append(HostsEntry(entry_type="ipv4", address=ip, names=[domain]))
+        if is_ipv4(ip):
+            entry_type = "ipv4"
+        elif is_ipv6(ip):
+            entry_type = "ipv6"
+        else:
+            continue
+
+        entry_list.append(HostsEntry(entry_type=entry_type, address=ip, names=[domain]))
 
     hosts.add(entry_list)
 
@@ -32,8 +39,11 @@ def dns_query(dns_server, domain):
         for i in A.response.answer:
             for j in i.items:
                 ip_list.append(j)
-    except:
+    except dns.exception.Timeout:
         pass
+    except:
+        traceback.print_exc()
+
     return ip_list
 
 
@@ -49,10 +59,19 @@ def dns_query_all(domain) -> (set, list):
         for ip in dns_query(dns_server, domain):
             ip_pool_dns.add(ip.__str__())
 
+    min_delay = None
+    min_delay_ip = None
     for ip in tqdm(ip_pool_dns, ncols=100, desc="ping {}".format(domain)):
-        if ping(ip, unit="ms", timeout=3) is not None:
-            ip_pool.add(ip)
+        try:
+            delay = ping(ip, unit="ms", timeout=3)
+            if delay is not None and (min_delay is None or min_delay > delay):
+                min_delay = delay
+                min_delay_ip = ip
+        except:
+            traceback.print_exc()
 
+    if min_delay_ip is not None:
+        ip_pool.add(min_delay_ip)
     return ip_pool
 
 
