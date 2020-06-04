@@ -39,7 +39,7 @@ def dns_query(dns_server, domain):
         for i in A.response.answer:
             for j in i.items:
                 ip_list.append(j)
-    except dns.exception.Timeout:
+    except (dns.exception.Timeout, dns.resolver.NoNameservers):
         pass
     except:
         traceback.print_exc()
@@ -47,7 +47,7 @@ def dns_query(dns_server, domain):
     return ip_list
 
 
-def dns_query_all(domain) -> (set, list):
+def dns_query_all(domain, all_save: bool = False) -> (set, list):
     if domain.startswith("*."):
         domain = domain.replace("*.", "", 1)
 
@@ -64,18 +64,20 @@ def dns_query_all(domain) -> (set, list):
     for ip in tqdm(ip_pool_dns, ncols=100, desc="ping {}".format(domain)):
         try:
             delay = ping(ip, unit="ms", timeout=3)
-            if delay is not None and (min_delay is None or min_delay > delay):
+            if all_save:
+                ip_pool.add(ip)
+            elif delay is not None and (min_delay is None or min_delay > delay):
                 min_delay = delay
                 min_delay_ip = ip
         except:
             traceback.print_exc()
 
-    if min_delay_ip is not None:
+    if not all_save and min_delay_ip is not None:
         ip_pool.add(min_delay_ip)
     return ip_pool
 
 
-def update_domain(domain, hosts_path=""):
+def update_domain(domain, hosts_path="", all_save: bool = False):
     if hosts_path == "":
         if sys.platform == "win32":
             hosts_path = "C:\WINDOWS\system32\drivers\etc\hosts"
@@ -96,14 +98,12 @@ def update_domain(domain, hosts_path=""):
 
     hosts = Hosts(path=hosts_path)
 
-    dns_rewrite_update(hosts, domain, dns_query_all(domain))
+    dns_rewrite_update(hosts, domain, dns_query_all(domain, all_save))
 
     hosts.write()
 
 
-def main(
-    domain_list=None, y: bool = False,
-):
+def main(domain_list=None, y: bool = False, a: bool = False):
     if domain_list is None:
         domain_list = [
             "github.githubassets.com",
@@ -142,7 +142,7 @@ def main(
 
     for domain in domain_list:
         print("check domain {}".format(domain))
-        update_domain(domain)
+        update_domain(domain, a)
 
 
 if __name__ == "__main__":
