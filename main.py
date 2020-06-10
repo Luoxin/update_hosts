@@ -41,6 +41,8 @@ def dns_query(dns_server, domain):
                 ip_list.append(j)
     except (dns.exception.Timeout, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN):
         pass
+    except dns.resolver.NoAnswer:
+        print("{} has not response".format(dns_server))
     except:
         traceback.print_exc()
 
@@ -69,6 +71,8 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
             elif delay is not None and (min_delay is None or min_delay > delay):
                 min_delay = delay
                 min_delay_ip = ip
+        except OSError:
+            pass
         except:
             traceback.print_exc()
 
@@ -140,7 +144,7 @@ def main(l=None, y: bool = False, a: bool = False):
         print("invalid domain_list")
 
     print(
-        "will check and update domains: {}[y/N]".format(" ".join(domain_list)), end=":"
+        "will check and update domains: {} [y/N]".format(" ".join(domain_list)), end=":"
     )
 
     if not y:
