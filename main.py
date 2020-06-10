@@ -16,7 +16,7 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     hosts.remove_all_matching(name=domain)
     entry_list = []
 
-    for ip in tqdm(ip_list, desc="write hosts"):
+    for ip in tqdm(ip_list, ncols=100, desc="write hosts"):
         if is_ipv4(ip):
             entry_type = "ipv4"
         elif is_ipv6(ip):
