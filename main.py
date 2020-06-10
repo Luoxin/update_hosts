@@ -39,7 +39,7 @@ def dns_query(dns_server, domain):
         for i in A.response.answer:
             for j in i.items:
                 ip_list.append(j)
-    except (dns.exception.Timeout, dns.resolver.NoNameservers):
+    except (dns.exception.Timeout, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN):
         pass
     except:
         traceback.print_exc()
