@@ -1,5 +1,5 @@
-tqdm==4.42.1
-fire==0.3.1
-ping3==2.6.5
-dnspython==1.16.0
 python_hosts==1.0.0
+ping3==2.6.5
+tqdm==4.46.0
+fire==0.3.1
+dnspython==1.16.0
