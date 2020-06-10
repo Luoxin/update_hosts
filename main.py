@@ -103,7 +103,15 @@ def update_domain(domain, hosts_path="", all_save: bool = False):
     hosts.write()
 
 
-def main(domain_list=None, y: bool = False, a: bool = False):
+def main(l=None, y: bool = False, a: bool = False):
+    """
+    :param l: domain list, is not input will use github.com
+    :param y: agree
+    :param a: all host write in hosts
+    :return:
+    """
+
+    domain_list = l
     if domain_list is None:
         domain_list = [
             "github.githubassets.com",
