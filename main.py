@@ -78,7 +78,7 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
     ip_pool_dns = set()
     ip_pool = set()
     for dns_server in tqdm(
-            dns_service_list, ncols=100, desc="dns query {}".format(domain)
+        dns_service_list, ncols=100, desc="dns query {}".format(domain)
     ):
         for ip in dns_query(dns_server, domain):
             ip_pool_dns.add(ip.__str__())
@@ -151,6 +151,8 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
     else:
         print("invalid domain_list")
 
+    domain_list = list(set(domain_list))
+
     print(
         "will check and update domains: {} [y/N]".format(" ".join(domain_list)), end=":"
     )
@@ -159,6 +161,8 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
         y = input()
         if y.lower() != "y":
             return
+    else:
+        print()
 
     for domain in domain_list:
         print("check domain {}".format(domain))
