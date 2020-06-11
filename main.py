@@ -9,6 +9,28 @@ from tqdm import tqdm
 from dns_list import dns_service_list
 
 
+def get_hosts(hosts_path=""):
+    if hosts_path == "":
+        if sys.platform == "win32":
+            hosts_path = "C:\WINDOWS\system32\drivers\etc\hosts"
+        elif sys.platform == "linux":
+            hosts_path = "/etc/hosts "
+        elif sys.platform == "darwin":
+            hosts_path = "/ect/hosts"
+        elif sys.platform == "cygwin":
+            hosts_path = "C:\WINDOWS\system32\drivers\etc\hosts"
+        elif sys.platform == "aix":
+            hosts_path = "/ect/hosts"
+        else:
+            print("Please input hosts path")
+            hosts_path = input()
+
+    if hosts_path == "":
+        return
+
+    return Hosts(path=hosts_path)
+
+
 def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     if len(ip_list) == 0:
         return
@@ -56,7 +78,7 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
     ip_pool_dns = set()
     ip_pool = set()
     for dns_server in tqdm(
-        dns_service_list, ncols=100, desc="dns query {}".format(domain)
+            dns_service_list, ncols=100, desc="dns query {}".format(domain)
     ):
         for ip in dns_query(dns_server, domain):
             ip_pool_dns.add(ip.__str__())
@@ -82,37 +104,23 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
 
 
 def update_domain(domain, hosts_path="", all_save: bool = False):
-    if hosts_path == "":
-        if sys.platform == "win32":
-            hosts_path = "C:\WINDOWS\system32\drivers\etc\hosts"
-        elif sys.platform == "linux":
-            hosts_path = "/etc/hosts "
-        elif sys.platform == "darwin":
-            hosts_path = "/ect/hosts"
-        elif sys.platform == "cygwin":
-            hosts_path = "C:\WINDOWS\system32\drivers\etc\hosts"
-        elif sys.platform == "aix":
-            hosts_path = "/ect/hosts"
-        else:
-            print("Please input hosts path")
-            hosts_path = input()
-
-    if hosts_path == "":
+    hosts = get_hosts(hosts_path)
+    if hosts is None:
         return
-
-    hosts = Hosts(path=hosts_path)
 
     dns_rewrite_update(hosts, domain, dns_query_all(domain, all_save))
 
     hosts.write()
 
 
-def main(l=None, y: bool = False, a: bool = False):
+def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
     """
+    update hosts
+    :param hosts_path:
     :param l: domain list, is not input will use github.com
     :param y: agree
     :param a: all host write in hosts
-    :return:
+    :return: hosts file path,if not input will use default path
     """
 
     domain_list = l
@@ -157,5 +165,23 @@ def main(l=None, y: bool = False, a: bool = False):
         update_domain(domain, a)
 
 
+def update_from_hosts(hosts_path: str = ""):
+    """
+    update hosts from hosts
+    :param hosts_path: hosts file path,if not input will use default path
+    :return:
+    """
+    hosts = get_hosts(hosts_path)
+    if hosts is None:
+        return
+
+    domain_list = []
+    for entry in hosts.entries:
+        if len(entry.names) > 0:
+            domain_list.extend(entry.names)
+
+    return update_dns(l=domain_list, y=True, a=False)
+
+
 if __name__ == "__main__":
-    fire.Fire({"update": main})
+    fire.Fire({"update": update_dns, "update_hosts": update_from_hosts})
