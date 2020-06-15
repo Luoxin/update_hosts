@@ -38,13 +38,15 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     hosts.remove_all_matching(name=domain)
     entry_list = []
 
-    for ip in tqdm(ip_list, ncols=100, desc="write hosts"):
+    for ip in tqdm(
+        ip_list, ncols=100, desc="write hosts {}({})".format(domain, ",".join(ip_list))
+    ):
         if is_ipv4(ip):
             entry_type = "ipv4"
         elif is_ipv6(ip):
             entry_type = "ipv6"
         else:
-            continue
+            print("{} type is err".format(ip))
 
         entry_list.append(HostsEntry(entry_type=entry_type, address=ip, names=[domain]))
 
@@ -103,14 +105,8 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
     return ip_pool
 
 
-def update_domain(domain, hosts_path="", all_save: bool = False):
-    hosts = get_hosts(hosts_path)
-    if hosts is None:
-        return
-
+def update_domain(domain, hosts: Hosts, all_save: bool = False):
     dns_rewrite_update(hosts, domain, dns_query_all(domain, all_save))
-
-    hosts.write()
 
 
 def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
@@ -126,12 +122,12 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
     domain_list = l
     if domain_list is None:
         domain_list = [
+            "github.com",
+            "api.github.com",
             "github.githubassets.com",
             "camo.githubusercontent.com",
             "github.map.fastly.net",
             "github.global.ssl.fastly.net",
-            "github.com",
-            "api.github.com",
             "raw.githubusercontent.com",
             "avatars5.githubusercontent.com",
             "avatars4.githubusercontent.com",
@@ -164,9 +160,16 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
     else:
         print()
 
+    hosts = get_hosts(hosts_path)
+
+    if hosts is None:
+        return
+
     for domain in domain_list:
         print("check domain {}".format(domain))
-        update_domain(domain, a)
+        update_domain(domain, hosts=hosts, all_save=a)
+        hosts.write()
+        hosts = get_hosts(hosts_path)
 
 
 def update_from_hosts(hosts_path: str = ""):
