@@ -59,7 +59,7 @@ def dns_query(dns_server, domain):
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [dns_server]
 
-        A = resolver.query(domain, lifetime=3)
+        A = resolver.query(domain, lifetime=1)
         for i in A.response.answer:
             for j in i.items:
                 ip_list.append(j)
@@ -89,7 +89,7 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
     min_delay_ip = None
     for ip in tqdm(ip_pool_dns, ncols=100, desc="ping {}".format(domain)):
         try:
-            delay = ping(ip, unit="ms", timeout=3)
+            delay = ping(ip, unit="ms", timeout=1)
             if all_save:
                 ip_pool.add(ip)
             elif delay is not None and (min_delay is None or min_delay > delay):
