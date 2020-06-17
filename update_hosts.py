@@ -47,10 +47,12 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
             entry_type = "ipv6"
         else:
             print("{} type is err".format(ip))
+            continue
 
         entry_list.append(HostsEntry(entry_type=entry_type, address=ip, names=[domain]))
 
-    hosts.add(entry_list)
+    if len(entry_list) > 0:
+        hosts.add(entry_list)
 
 
 def dns_query(dns_server, domain):
@@ -89,6 +91,11 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
     min_delay_ip = None
     for ip in tqdm(ip_pool_dns, ncols=100, desc="ping {}".format(domain)):
         try:
+            if is_ipv4(ip) or is_ipv6(ip):
+                pass
+            else:
+                print("{} type is err".format(ip))
+                continue
             delay = ping(ip, unit="ms", timeout=1)
             if all_save:
                 ip_pool.add(ip)
