@@ -64,11 +64,12 @@ def dns_query(dns_server, domain):
         A = resolver.query(domain, lifetime=1)
         for i in A.response.answer:
             for j in i.items:
-                if is_ipv4(j) or is_ipv6(j):
+                ip = j.__str__()
+                if is_ipv4(ip) or is_ipv6(ip):
                     pass
                 else:
                     continue
-                ip_list.append(j)
+                ip_list.append(ip)
     except (dns.exception.Timeout, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN):
         pass
     except dns.resolver.NoAnswer:
@@ -89,7 +90,7 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
         dns_service_list, ncols=100, desc="dns query {}".format(domain)
     ):
         for ip in dns_query(dns_server, domain):
-            ip_pool_dns.add(ip.__str__())
+            ip_pool_dns.add(ip)
 
     min_delay = None
     min_delay_ip = None
