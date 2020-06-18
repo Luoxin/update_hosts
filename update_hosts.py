@@ -55,15 +55,20 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
         hosts.add(entry_list)
 
 
-def dns_query(dns_server, domain):
+def dns_query(dns_server, domain) -> list:
     ip_list = []
     try:
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [dns_server]
 
         A = resolver.query(domain, lifetime=1)
+
         for i in A.response.answer:
             for j in i.items:
+
+                if not isinstance(j, dns.rdtypes.IN.A.A):
+                    continue
+
                 ip = j.__str__()
                 if is_ipv4(ip) or is_ipv6(ip):
                     pass
@@ -178,7 +183,7 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
         return
 
     for domain in domain_list:
-        print("check domain {}".format(domain))
+        print("check domain {} ......".format(domain))
         update_domain(domain, hosts=hosts, all_save=a)
         hosts.write()
         hosts = get_hosts(hosts_path)
