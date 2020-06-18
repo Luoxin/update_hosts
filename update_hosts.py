@@ -179,9 +179,11 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
         hosts = get_hosts(hosts_path)
 
 
-def update_from_hosts(hosts_path: str = ""):
+def update_from_hosts(hosts_path: str = "", y: bool = False, a: bool = False):
     """
     update hosts from hosts
+    :param y: agree
+    :param a: all host write in hosts
     :param hosts_path: hosts file path,if not input will use default path
     :return:
     """
@@ -194,7 +196,7 @@ def update_from_hosts(hosts_path: str = ""):
         if len(entry.names) > 0:
             domain_list.extend(entry.names)
 
-    return update_dns(l=domain_list, y=True, a=False)
+    return update_dns(l=domain_list, y=y, a=a)
 
 
 if __name__ == "__main__":
