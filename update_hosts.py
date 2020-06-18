@@ -64,6 +64,10 @@ def dns_query(dns_server, domain):
         A = resolver.query(domain, lifetime=1)
         for i in A.response.answer:
             for j in i.items:
+                if is_ipv4(j) or is_ipv6(j):
+                    pass
+                else:
+                    continue
                 ip_list.append(j)
     except (dns.exception.Timeout, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN):
         pass
