@@ -1,62 +1,53 @@
-import sys
 import traceback
+
 import dns.resolver
 import fire
 from ping3 import ping
-from python_hosts import Hosts, HostsEntry, is_ipv4, is_ipv6
+
+# from python_hosts import Hosts, HostsEntry, is_ipv4, is_ipv6
 from tqdm import tqdm
 
 from dns_list import dns_service_list
+from hosts import Hosts, HostsEntry
+from utils import is_ipv4, is_ipv6
 
 
 def get_hosts(hosts_path=""):
-    if hosts_path == "":
-        if sys.platform == "win32":
-            hosts_path = "C:\WINDOWS\system32\drivers\etc\hosts"
-        elif sys.platform == "linux":
-            hosts_path = "/etc/hosts "
-        elif sys.platform == "darwin":
-            hosts_path = "/ect/hosts"
-        elif sys.platform == "cygwin":
-            hosts_path = "C:\WINDOWS\system32\drivers\etc\hosts"
-        elif sys.platform == "aix":
-            hosts_path = "/ect/hosts"
-        else:
-            print("Please input hosts path")
-            hosts_path = input()
-
-    if hosts_path == "":
-        return
-
     return Hosts(path=hosts_path)
 
 
 def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     if len(ip_list) == 0:
+        print("not query ip for domain {}".format(domain))
         return
 
     hosts.remove_all_matching(name=domain)
     entry_list = []
 
     for ip in tqdm(
-        ip_list, ncols=100, desc="write hosts {}({})".format(domain, ",".join(ip_list))
+        ip_list,
+        ncols=100,
+        desc="add hosts to cache {}({})".format(domain, ",".join(ip_list)),
     ):
         if is_ipv4(ip):
             entry_type = "ipv4"
         elif is_ipv6(ip):
             entry_type = "ipv6"
         else:
-            print("{} type is err".format(ip))
-            continue
+            entry_type = "comment"
 
         entry_list.append(HostsEntry(entry_type=entry_type, address=ip, names=[domain]))
 
     if len(entry_list) > 0:
         hosts.add(entry_list)
+    else:
+        print("not query ip for domain {}".format(domain))
+        return
 
 
-def dns_query(dns_server, domain) -> list:
+def dns_query(dns_server, domain) -> (list, list):
     ip_list = []
+    cname_list = []
     try:
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [dns_server]
@@ -65,11 +56,16 @@ def dns_query(dns_server, domain) -> list:
 
         for i in A.response.answer:
             for j in i.items:
+                ip = j.__str__()
 
-                if not isinstance(j, dns.rdtypes.IN.A.A):
+                if isinstance(j, dns.rdtypes.nsbase.NSBase):
+                    cname_list.append(ip)
                     continue
 
-                ip = j.__str__()
+                if not isinstance(j, dns.rdtypes.IN.A.A):
+                    print(type(j))
+                    continue
+
                 if is_ipv4(ip) or is_ipv6(ip):
                     pass
                 else:
@@ -82,33 +78,46 @@ def dns_query(dns_server, domain) -> list:
     except:
         traceback.print_exc()
 
-    return ip_list
+    return ip_list, cname_list
 
 
-def dns_query_all(domain, all_save: bool = False) -> (set, list):
+def dns_query_all(domain, all_save: bool = False) -> list:
     if domain.startswith("*."):
         domain = domain.replace("*.", "", 1)
 
-    ip_pool_dns = set()
-    ip_pool = set()
+    ip_pool_dns = []
+    cnames = []
+
     for dns_server in tqdm(
         dns_service_list, ncols=100, desc="dns query {}".format(domain)
     ):
-        for ip in dns_query(dns_server, domain):
-            ip_pool_dns.add(ip)
+        ip_list, cname_list = dns_query(dns_server, domain)
+        ip_pool_dns.extend(ip_list)
+        cnames.extend(cname_list)
+
+    if len(cnames) > 0:
+        cnames = set(cnames)
+        for cname in cnames:
+            ip_pool_dns.extend(dns_query_all(cname, True))
+
+    ip_pool_dns = set(ip_pool_dns)
 
     min_delay = None
     min_delay_ip = None
-    for ip in tqdm(ip_pool_dns, ncols=100, desc="ping {}".format(domain)):
+    ip_pool = []
+    for ip in tqdm(
+        ip_pool_dns, ncols=100, desc="ping {}({})".format(domain, ",".join(ip_pool_dns))
+    ):
         try:
             if is_ipv4(ip) or is_ipv6(ip):
                 pass
             else:
                 print("{} type is err".format(ip))
                 continue
+
             delay = ping(ip, unit="ms", timeout=1)
             if all_save:
-                ip_pool.add(ip)
+                ip_pool.append(ip)
             elif delay is not None and (min_delay is None or min_delay > delay):
                 min_delay = delay
                 min_delay_ip = ip
@@ -118,8 +127,9 @@ def dns_query_all(domain, all_save: bool = False) -> (set, list):
             traceback.print_exc()
 
     if not all_save and min_delay_ip is not None:
-        ip_pool.add(min_delay_ip)
-    return ip_pool
+        ip_pool.append(min_delay_ip)
+
+    return list(set(ip_pool))
 
 
 def update_domain(domain, hosts: Hosts, all_save: bool = False):
@@ -146,12 +156,14 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
             "github.map.fastly.net",
             "github.global.ssl.fastly.net",
             "raw.githubusercontent.com",
-            "avatars5.githubusercontent.com",
-            "avatars4.githubusercontent.com",
-            "avatars3.githubusercontent.com",
-            "avatars2.githubusercontent.com",
-            "avatars1.githubusercontent.com",
+            "user-images.githubusercontent.com",
+            "favicons.githubusercontent.com",
             "avatars0.githubusercontent.com",
+            "avatars1.githubusercontent.com",
+            "avatars2.githubusercontent.com",
+            "avatars3.githubusercontent.com",
+            "avatars4.githubusercontent.com",
+            "avatars5.githubusercontent.com",
         ]
 
     if isinstance(domain_list, str):
@@ -178,15 +190,14 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
         print()
 
     hosts = get_hosts(hosts_path)
-
     if hosts is None:
         return
 
     for domain in domain_list:
         print("check domain {} ......".format(domain))
         update_domain(domain, hosts=hosts, all_save=a)
-        hosts.write()
-        hosts = get_hosts(hosts_path)
+
+    hosts.write()
 
 
 def update_from_hosts(hosts_path: str = "", y: bool = False, a: bool = False):
