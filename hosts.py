@@ -1,6 +1,5 @@
 import sys
 
-from urllib.request import urlopen
 from utils import is_ipv4, is_ipv6, is_readable, valid_hostnames, dedupe_list
 
 
