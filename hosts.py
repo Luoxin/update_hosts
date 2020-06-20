@@ -1,6 +1,6 @@
 import sys
 
-from utils import is_ipv4, is_ipv6, is_readable, valid_hostnames, dedupe_list
+from utils import is_ipv4, is_ipv6, is_readable, valid_hostnames
 
 
 class HostsException(Exception):

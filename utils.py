@@ -1,20 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-This module contains utility functions used by the Hosts and HostsEntry methods
-"""
 import os
 import re
-import win_inet_pton
 
 import socket
 
 
 def is_ipv4(entry):
-    """
-    Check if the string provided is a valid ipv4 address
-    :param entry: A string representation of an IP address
-    :return: True if valid, False if invalid
-    """
     try:
         if socket.inet_aton(entry):
             return True
@@ -44,8 +34,3 @@ def is_readable(path=None):
     if os.path.isfile(path) and os.access(path, os.R_OK):
         return True
     return False
-
-
-def dedupe_list(seq):
-    seen = set()
-    return [x for x in seq if not (x in seen or seen.add(x))]
