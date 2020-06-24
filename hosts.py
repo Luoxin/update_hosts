@@ -1,5 +1,7 @@
 import sys
 
+from tqdm import tqdm
+
 from utils import is_ipv4, is_ipv6, is_readable, valid_hostnames
 
 
@@ -56,23 +58,10 @@ class InvalidComment(HostsEntryException):
     pass
 
 
-from tqdm import tqdm
-
-
 class HostsEntry(object):
-    """ An entry in a hosts file. """
-
     __slots__ = ["entry_type", "address", "comment", "names"]
 
     def __init__(self, entry_type=None, address=None, comment=None, names=None):
-        """
-        Initialise an instance of a Hosts file entry
-        :param entry_type: ipv4 | ipv6 | comment | blank
-        :param address: The ipv4 or ipv6 address belonging to the instance
-        :param comment: The comment belonging to the instance
-        :param names: The names that resolve to the specified address
-        :return: None
-        """
         if not entry_type or entry_type not in ("ipv4", "ipv6", "comment", "blank"):
             raise Exception("entry_type invalid or not specified")
 
@@ -119,11 +108,6 @@ class HostsEntry(object):
 
     @staticmethod
     def get_entry_type(hosts_entry=None):
-        """
-        Return the type of entry for the line of hosts file passed
-        :param hosts_entry: A line from the hosts file
-        :return: 'comment' | 'blank' | 'ipv4' | 'ipv6'
-        """
         if hosts_entry and isinstance(hosts_entry, str):
             entry = hosts_entry.strip()
             if not entry or not entry[0] or entry[0] == "\n":
@@ -138,11 +122,6 @@ class HostsEntry(object):
 
     @staticmethod
     def str_to_hostentry(entry):
-        """
-        Transform a line from a hosts file into an instance of HostsEntry
-        :param entry: A line from the hosts file
-        :return: An instance of HostsEntry
-        """
         line_parts = entry.strip().split()
         if is_ipv4(line_parts[0]) and valid_hostnames(line_parts[1:]):
             return HostsEntry(
@@ -157,17 +136,9 @@ class HostsEntry(object):
 
 
 class Hosts(object):
-    """ A hosts file. """
-
     __slots__ = ["entries", "hosts_path"]
 
     def __init__(self, path=None):
-        """
-        Initialise an instance of a hosts file
-        :param path: The filesystem path of the hosts file to manage
-        :return: None
-        """
-
         self.entries = []
         if path:
             self.hosts_path = path
@@ -187,19 +158,10 @@ class Hosts(object):
         return output
 
     def count(self):
-        """ Get a count of the number of host entries
-        :return: The number of host entries
-        """
         return len(self.entries)
 
     @staticmethod
     def determine_hosts_path(platform=None):
-        """
-        Return the hosts file path based on the supplied
-        or detected platform.
-        :param platform: a string used to identify the platform
-        :return: detected filesystem path of the hosts file
-        """
         if platform:
             pass
         elif sys.platform.startswith("win"):
@@ -244,24 +206,7 @@ class Hosts(object):
         except:
             raise UnableToWriteHosts()
 
-    @staticmethod
-    def get_hosts_by_url(url=None):
-        """
-        Request the content of a URL and return the response
-        :param url: The URL of the hosts file to download
-        :return: The content of the passed URL
-        """
-        response = urlopen(url)
-        return response.read()
-
     def exists(self, address=None, names=None, comment=None):
-        """
-        Determine if the supplied address and/or names, or comment, exists in a HostsEntry within Hosts
-        :param address: An ipv4 or ipv6 address to search for
-        :param names: A list of names to search for
-        :param comment: A comment to search for
-        :return: True if a supplied address, name, or comment is found. Otherwise, False.
-        """
         for entry in self.entries:
             if entry.entry_type in ("ipv4", "ipv6"):
                 if address and address == entry.address:
@@ -275,13 +220,6 @@ class Hosts(object):
         return False
 
     def remove_all_matching(self, address=None, name=None):
-        """
-        Remove all HostsEntry instances from the Hosts object
-        where the supplied ip address or name matches
-        :param address: An ipv4 or ipv6 address
-        :param name: A host name
-        :return: None
-        """
         if self.entries:
             if address and name:
                 func = lambda entry: not entry.is_real_entry() or (
@@ -300,13 +238,6 @@ class Hosts(object):
             self.entries = list(filter(func, self.entries))
 
     def import_url(self, url=None, force=None):
-        """
-        Read a list of host entries from a URL, convert them into instances of HostsEntry and
-        then append to the list of entries in Hosts
-        :param force:
-        :param url: The URL of where to download a hosts file
-        :return: Counts reflecting the attempted additions
-        """
         file_contents = self.get_hosts_by_url(url=url).decode("utf-8")
         file_contents = file_contents.rstrip().replace("^M", "\n")
         file_contents = file_contents.rstrip().replace("\r\n", "\n")
@@ -333,12 +264,6 @@ class Hosts(object):
         }
 
     def import_file(self, import_file_path=None):
-        """
-        Read a list of host entries from a file, convert them into instances
-        of HostsEntry and then append to the list of entries in Hosts
-        :param import_file_path: The path to the file containing the host entries
-        :return: Counts reflecting the attempted additions
-        """
         skipped = 0
         invalid_count = 0
         if is_readable(import_file_path):
@@ -385,11 +310,6 @@ class Hosts(object):
                 raise InvalidAddress()
 
     def populate_entries(self):
-        """
-        Called by the initialiser of Hosts. This reads the entries from the local hosts file,
-        converts them into instances of HostsEntry and adds them to the Hosts list of entries.
-        :return: None
-        """
         try:
             with open(self.hosts_path, "r") as hosts_file:
                 hosts_entries = [line for line in hosts_file]

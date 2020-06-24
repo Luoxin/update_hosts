@@ -2,6 +2,7 @@ import traceback
 
 import dns.resolver
 import fire
+import requests
 from ping3 import ping
 
 # from python_hosts import Hosts, HostsEntry, is_ipv4, is_ipv6
@@ -10,6 +11,8 @@ from tqdm import tqdm
 from dns_list import dns_service_list
 from hosts import Hosts, HostsEntry
 from utils import is_ipv4, is_ipv6
+
+ncol = 150
 
 
 def get_hosts(hosts_path=""):
@@ -26,7 +29,7 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
 
     for ip in tqdm(
         ip_list,
-        ncols=100,
+        ncols=ncol,
         desc="add hosts to cache {}({})".format(domain, ",".join(ip_list)),
     ):
         if is_ipv4(ip):
@@ -45,32 +48,48 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
         return
 
 
-def dns_query(dns_server, domain) -> (list, list):
+def dns_query(dns_server: str, domain: str) -> (list, list):
     ip_list = []
     cname_list = []
     try:
-        resolver = dns.resolver.Resolver()
-        resolver.nameservers = [dns_server]
+        if dns_server.startswith("http"):
 
-        A = resolver.query(domain, lifetime=1)
-
-        for i in A.response.answer:
-            for j in i.items:
-                ip = j.__str__()
-
-                if isinstance(j, dns.rdtypes.nsbase.NSBase):
-                    cname_list.append(ip)
-                    continue
-
-                if not isinstance(j, dns.rdtypes.IN.A.A):
-                    print(type(j))
-                    continue
-
-                if is_ipv4(ip) or is_ipv6(ip):
-                    pass
+            ae = requests.get(
+                dns_server,
+                params={"name": domain, "type": "A", "ct": "application/dns-json"},
+                timeout=5,
+            ).json()
+            for answer in ae.get("Answer"):
+                if answer.get("type") == 1:
+                    ip_list.append(str(answer.get("data")))
+                elif answer.get("type") == 5:
+                    cname_list.append(str(answer.get("data")))
                 else:
-                    continue
-                ip_list.append(ip)
+                    print(answer)
+
+        else:
+            resolver = dns.resolver.Resolver()
+            resolver.nameservers = [dns_server]
+
+            A = resolver.query(domain, lifetime=1, rdtype=dns.rdatatype.A)
+
+            for i in A.response.answer:
+                for j in i.items:
+                    ip = j.__str__()
+
+                    if isinstance(j, dns.rdtypes.nsbase.NSBase):
+                        cname_list.append(ip)
+                        continue
+
+                    if not isinstance(j, dns.rdtypes.IN.A.A):
+                        print(type(j))
+                        continue
+
+                    if is_ipv4(ip) or is_ipv6(ip):
+                        pass
+                    else:
+                        continue
+                    ip_list.append(ip)
     except (dns.exception.Timeout, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN):
         pass
     except dns.resolver.NoAnswer:
@@ -89,7 +108,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     cnames = []
 
     for dns_server in tqdm(
-        dns_service_list, ncols=100, desc="dns query {}".format(domain)
+        dns_service_list, ncols=ncol, desc="dns query {}".format(domain)
     ):
         ip_list, cname_list = dns_query(dns_server, domain)
         ip_pool_dns.extend(ip_list)
@@ -106,7 +125,9 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     min_delay_ip = None
     ip_pool = []
     for ip in tqdm(
-        ip_pool_dns, ncols=100, desc="ping {}({})".format(domain, ",".join(ip_pool_dns))
+        ip_pool_dns,
+        # ncols=ncol,
+        desc="ping {}({})".format(domain, ",".join(ip_pool_dns)),
     ):
         try:
             if is_ipv4(ip) or is_ipv6(ip):
