@@ -53,7 +53,6 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
     cname_list = []
     try:
         if dns_server.startswith("http"):
-
             ae = requests.get(
                 dns_server,
                 params={"name": domain, "type": "A", "ct": "application/dns-json"},
@@ -90,7 +89,7 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
                     else:
                         continue
                     ip_list.append(ip)
-    except (dns.exception.Timeout, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN):
+    except (dns.exception.Timeout, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN, requests.exceptions.Timeout):
         pass
     except dns.resolver.NoAnswer:
         print("{} has not response".format(dns_server))
