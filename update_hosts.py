@@ -64,11 +64,12 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
 
             if isinstance(ae.get("Answer"), (list, set, tuple)):
                 for answer in ae.get("Answer"):
-                    if answer.get("type") == 1:
+                    t = answer.get("type")
+                    if t == 1:
                         ip_list.append(str(answer.get("data")))
-                    elif answer.get("type") == 5:
+                    elif t == 5:
                         cname_list.append(str(answer.get("data")))
-                    elif answer.get("type") in [46]:
+                    elif t in [46]:
                         continue
                     else:
                         print(answer)
