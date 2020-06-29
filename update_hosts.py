@@ -59,7 +59,7 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
             ae = requests.get(
                 dns_server,
                 params={"name": domain, "type": "A", "ct": "application/dns-json"},
-                timeout=3,
+                timeout=1,
             ).json()
             for answer in ae.get("Answer"):
                 if answer.get("type") == 1:
