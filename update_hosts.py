@@ -1,8 +1,11 @@
 import traceback
 
 import dns.resolver
+import dns.rdtypes.nsbase
+import dns.rdtypes.ANY.RRSIG
 import fire
 import requests
+import simplejson
 from ping3 import ping
 
 # from python_hosts import Hosts, HostsEntry, is_ipv4, is_ipv6
@@ -56,13 +59,15 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
             ae = requests.get(
                 dns_server,
                 params={"name": domain, "type": "A", "ct": "application/dns-json"},
-                timeout=5,
+                timeout=3,
             ).json()
             for answer in ae.get("Answer"):
                 if answer.get("type") == 1:
                     ip_list.append(str(answer.get("data")))
                 elif answer.get("type") == 5:
                     cname_list.append(str(answer.get("data")))
+                elif answer.get("type") in [46]:
+                    continue
                 else:
                     print(answer)
 
@@ -80,8 +85,12 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
                         cname_list.append(ip)
                         continue
 
+                    if isinstance(j, dns.rdtypes.ANY.RRSIG.RRSIG):
+                        # TODO
+                        continue
+
                     if not isinstance(j, dns.rdtypes.IN.A.A):
-                        print(type(j))
+                        print("j:{},type:{}".format(j, type(j)))
                         continue
 
                     if is_ipv4(ip) or is_ipv6(ip):
@@ -89,7 +98,14 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
                     else:
                         continue
                     ip_list.append(ip)
-    except (dns.exception.Timeout, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN, requests.exceptions.Timeout):
+    except (
+        dns.exception.Timeout,
+        dns.resolver.NoNameservers,
+        dns.resolver.NXDOMAIN,
+        requests.exceptions.Timeout,
+        simplejson.errors.JSONDecodeError,
+        requests.exceptions.ConnectionError,
+    ):
         pass
     except dns.resolver.NoAnswer:
         print("{} has not response".format(dns_server))
