@@ -61,15 +61,17 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
                 params={"name": domain, "type": "A", "ct": "application/dns-json"},
                 timeout=1,
             ).json()
-            for answer in ae.get("Answer"):
-                if answer.get("type") == 1:
-                    ip_list.append(str(answer.get("data")))
-                elif answer.get("type") == 5:
-                    cname_list.append(str(answer.get("data")))
-                elif answer.get("type") in [46]:
-                    continue
-                else:
-                    print(answer)
+
+            if isinstance(ae.get("Answer"), (list, set, tuple)):
+                for answer in ae.get("Answer"):
+                    if answer.get("type") == 1:
+                        ip_list.append(str(answer.get("data")))
+                    elif answer.get("type") == 5:
+                        cname_list.append(str(answer.get("data")))
+                    elif answer.get("type") in [46]:
+                        continue
+                    else:
+                        print(answer)
 
         else:
             resolver = dns.resolver.Resolver()
