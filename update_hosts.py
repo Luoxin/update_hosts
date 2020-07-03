@@ -1,18 +1,17 @@
 import traceback
-from rich.console import Console
 
-import dns.resolver
-import dns.rdtypes.nsbase
 import dns.rdtypes.ANY.RRSIG
+import dns.rdtypes.nsbase
+import dns.resolver
 import fire
 import requests
-from rich.table import Column, Table
 import simplejson
-from ping3 import ping
-
 from cacheout import Cache
+from ping3 import ping
 from rich import print
+from rich.console import Console
 from rich.progress import track
+from rich.table import Table
 
 from dns_list import dns_service_list
 from hosts import Hosts, HostsEntry
