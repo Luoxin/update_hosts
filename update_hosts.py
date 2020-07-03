@@ -6,9 +6,11 @@ import dns.rdtypes.nsbase
 import dns.rdtypes.ANY.RRSIG
 import fire
 import requests
+from rich.table import Column, Table
 import simplejson
 from ping3 import ping
 
+from cacheout import Cache
 from rich import print
 from rich.progress import track
 
@@ -17,6 +19,8 @@ from hosts import Hosts, HostsEntry
 from utils import is_ipv4, is_ipv6
 
 console = Console()
+
+cache = Cache()
 
 
 def get_hosts(hosts_path=""):
@@ -129,6 +133,9 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     if domain.startswith("*."):
         domain = domain.replace("*.", "", 1)
 
+    if cache.get(key=domain) is not None:
+        return cache.get(key=domain)
+
     ip_pool_dns = []
     cnames = []
 
@@ -177,7 +184,8 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     if not all_save and min_delay_ip is not None:
         ip_pool.append(min_delay_ip)
 
-    return list(set(ip_pool))
+    cache.set(domain, list(set(ip_pool)))
+    return cache.get(domain)
 
 
 def update_domain(domain, hosts: Hosts, all_save: bool = False):
@@ -251,6 +259,16 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
         update_domain(domain, hosts=hosts, all_save=a)
 
     hosts.write()
+
+    table = Table(title="Hosts File", show_header=True, header_style="bold magenta")
+    table.add_column("domain", justify="center", style="magenta")
+    table.add_column("ip", justify="center", style="cyan")
+
+    for entry in hosts.entries:
+        if isinstance(entry.names, (tuple, set, list)) and len(entry.names) > 0:
+            table.add_row(entry.names[0], entry.address)
+
+    console.print(table)
 
 
 def update_from_hosts(hosts_path: str = "", y: bool = False, a: bool = False):
