@@ -8,14 +8,11 @@ import requests
 import simplejson
 from ping3 import ping
 
-# from python_hosts import Hosts, HostsEntry, is_ipv4, is_ipv6
 from tqdm import tqdm
 
 from dns_list import dns_service_list
 from hosts import Hosts, HostsEntry
 from utils import is_ipv4, is_ipv6
-
-ncol = 150
 
 
 def get_hosts(hosts_path=""):
@@ -30,11 +27,9 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     hosts.remove_all_matching(name=domain)
     entry_list = []
 
-    for ip in tqdm(
-        ip_list,
-        ncols=ncol,
-        desc="add hosts to cache {}({})".format(domain, ",".join(ip_list)),
-    ):
+    print("will add hosts to cache {}({})".format(domain, ",".join(ip_list)))
+
+    for ip in tqdm(ip_list, ncols=100, desc="add hosts to cache {}".format(domain), ):
         if is_ipv4(ip):
             entry_type = "ipv4"
         elif is_ipv6(ip):
@@ -126,7 +121,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     cnames = []
 
     for dns_server in tqdm(
-        dns_service_list, ncols=ncol, desc="dns query {}".format(domain)
+            dns_service_list, ncols=100, desc="dns query {}".format(domain)
     ):
         ip_list, cname_list = dns_query(dns_server, domain)
         ip_pool_dns.extend(ip_list)
@@ -139,14 +134,12 @@ def dns_query_all(domain, all_save: bool = False) -> list:
 
     ip_pool_dns = set(ip_pool_dns)
 
+    print("will ping {}({})".format(domain, ",".join(ip_pool_dns)))
+
     min_delay = None
     min_delay_ip = None
     ip_pool = []
-    for ip in tqdm(
-        ip_pool_dns,
-        # ncols=ncol,
-        desc="ping {}({})".format(domain, ",".join(ip_pool_dns)),
-    ):
+    for ip in tqdm(ip_pool_dns, ncols=100, desc="ping {}".format(domain), ):
         try:
             if is_ipv4(ip) or is_ipv6(ip):
                 pass
