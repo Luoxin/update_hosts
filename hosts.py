@@ -1,6 +1,6 @@
 import sys
 
-from tqdm import tqdm
+from rich.progress import track
 
 from utils import is_ipv4, is_ipv6, is_readable, valid_hostnames
 
@@ -186,10 +186,9 @@ class Hosts(object):
             output_file_path = self.hosts_path
         try:
             with open(output_file_path, "w") as hosts_file:
-                for line in tqdm(
-                    self.entries,
-                    ncols=100,
-                    desc="write into hosts file {}".format(self.hosts_path),
+                for line in track(
+                        self.entries,
+                        description="write into hosts file {}".format(self.hosts_path),
                 ):
                     if line.entry_type == "comment":
                         hosts_file.write(line.comment + "\n")
@@ -197,7 +196,7 @@ class Hosts(object):
                         hosts_file.write("\n")
                     elif line.entry_type == "ipv4":
                         hosts_file.write(
-                            "{0}\t{1}\n".format(line.address, " ".join(line.names),)
+                            "{0}\t{1}\n".format(line.address, " ".join(line.names), )
                         )
                     elif line.entry_type == "ipv6":
                         hosts_file.write(
