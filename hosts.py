@@ -187,8 +187,8 @@ class Hosts(object):
         try:
             with open(output_file_path, "w") as hosts_file:
                 for line in track(
-                        self.entries,
-                        description="write into hosts file {}".format(self.hosts_path),
+                    self.entries,
+                    description="write into hosts file {}".format(self.hosts_path),
                 ):
                     if line.entry_type == "comment":
                         hosts_file.write(line.comment + "\n")
@@ -196,7 +196,7 @@ class Hosts(object):
                         hosts_file.write("\n")
                     elif line.entry_type == "ipv4":
                         hosts_file.write(
-                            "{0}\t{1}\n".format(line.address, " ".join(line.names), )
+                            "{0}\t{1}\n".format(line.address, " ".join(line.names),)
                         )
                     elif line.entry_type == "ipv6":
                         hosts_file.write(

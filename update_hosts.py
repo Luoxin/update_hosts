@@ -1,4 +1,6 @@
+import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED, ALL_COMPLETED
 
 import dns.rdtypes.ANY.RRSIG
 import dns.rdtypes.nsbase
@@ -42,7 +44,7 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
 
     # for ip in tqdm(ip_list, ncols=100, desc="add hosts to cache {}".format(domain), ):
     for ip in track(
-            ip_list, description="add hosts to cache [blue]{}[/blue]".format(domain),
+        ip_list, description="add hosts to cache [blue]{}[/blue]".format(domain),
     ):
         if is_ipv4(ip):
             entry_type = "ipv4"
@@ -68,7 +70,7 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
             ae = requests.get(
                 dns_server,
                 params={"name": domain, "type": "A", "ct": "application/dns-json"},
-                timeout=1,
+                timeout=5,
             ).json()
 
             if isinstance(ae.get("Answer"), (list, set, tuple)):
@@ -87,7 +89,7 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
             resolver = dns.resolver.Resolver()
             resolver.nameservers = [dns_server]
 
-            A = resolver.query(domain, lifetime=1, rdtype=dns.rdatatype.A)
+            A = resolver.query(domain, lifetime=5, rdtype=dns.rdatatype.A)
 
             for i in A.response.answer:
                 for j in i.items:
@@ -111,12 +113,12 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
                         continue
                     ip_list.append(ip)
     except (
-            dns.exception.Timeout,
-            dns.resolver.NoNameservers,
-            dns.resolver.NXDOMAIN,
-            requests.exceptions.Timeout,
-            simplejson.errors.JSONDecodeError,
-            requests.exceptions.ConnectionError,
+        dns.exception.Timeout,
+        dns.resolver.NoNameservers,
+        dns.resolver.NXDOMAIN,
+        requests.exceptions.Timeout,
+        simplejson.errors.JSONDecodeError,
+        requests.exceptions.ConnectionError,
     ):
         pass
     except dns.resolver.NoAnswer:
@@ -139,7 +141,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     cnames = []
 
     for dns_server in track(
-            dns_service_list, description="dns query [blue]{}[/blue]".format(domain)
+        dns_service_list, description="dns query [blue]{}[/blue]".format(domain)
     ):
         ip_list, cname_list = dns_query(dns_server, domain)
         ip_pool_dns.extend(ip_list)
@@ -161,7 +163,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     min_delay = None
     min_delay_ip = None
     ip_pool = []
-    for ip in track(ip_pool_dns, description="ping [blue]{}[/blue]".format(domain), ):
+    for ip in track(ip_pool_dns, description="ping [blue]{}[/blue]".format(domain),):
         try:
             if is_ipv4(ip) or is_ipv6(ip):
                 pass
@@ -169,7 +171,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
                 print("{} type is err".format(ip))
                 continue
 
-            delay = ping(ip, unit="ms", timeout=1)
+            delay = ping(ip, unit="ms", timeout=5)
             if all_save:
                 ip_pool.append(ip)
             elif delay is not None and (min_delay is None or min_delay > delay):
@@ -188,7 +190,9 @@ def dns_query_all(domain, all_save: bool = False) -> list:
 
 
 def update_domain(domain, hosts: Hosts, all_save: bool = False):
+    console.print("update domain hosts [blue]{}[/blue] ......".format(domain))
     dns_rewrite_update(hosts, domain, dns_query_all(domain, all_save))
+    console.print("update domain hosts [blue]{}[/blue] finished".format(domain))
 
 
 def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
@@ -253,9 +257,13 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
     if hosts is None:
         return
 
-    for domain in domain_list:
-        print("check domain [blue]{}[/blue] ......".format(domain))
-        update_domain(domain, hosts=hosts, all_save=a)
+    with ThreadPoolExecutor(max_workers=2) as t:
+        all_task = [
+            t.submit(update_domain, domain=domain, hosts=hosts, all_save=a)
+            for domain in domain_list
+        ]
+        wait(all_task, return_when=ALL_COMPLETED)
+        print("all domain update finish")
 
     hosts.write()
 
