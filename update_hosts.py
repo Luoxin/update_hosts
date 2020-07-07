@@ -1,6 +1,5 @@
-import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED, ALL_COMPLETED
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 
 import dns.rdtypes.ANY.RRSIG
 import dns.rdtypes.nsbase
@@ -37,14 +36,14 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     entry_list = []
 
     console.print(
-        "will add hosts to cache [blue]{}[blue]([green]{}[/green])".format(
+        "will add hosts to cache [yellow]{}[yellow]([green]{}[/green])".format(
             domain, ",".join(ip_list)
         )
     )
 
     # for ip in tqdm(ip_list, ncols=100, desc="add hosts to cache {}".format(domain), ):
     for ip in track(
-        ip_list, description="add hosts to cache [blue]{}[/blue]".format(domain),
+            ip_list, description="add hosts to cache [yellow]{}[/yellow]".format(domain),
     ):
         if is_ipv4(ip):
             entry_type = "ipv4"
@@ -141,7 +140,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     cnames = []
 
     for dns_server in track(
-        dns_service_list, description="dns query [blue]{}[/blue]".format(domain)
+            dns_service_list, description="dns query [yellow]{}[/yellow]".format(domain)
     ):
         ip_list, cname_list = dns_query(dns_server, domain)
         ip_pool_dns.extend(ip_list)
@@ -155,7 +154,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     ip_pool_dns = set(ip_pool_dns)
 
     print(
-        "will ping [blue]{}[/blue]([green]{}[/green])".format(
+        "will ping [yellow]{}[/yellow]([green]{}[/green])".format(
             domain, ",".join(ip_pool_dns)
         )
     )
@@ -163,7 +162,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     min_delay = None
     min_delay_ip = None
     ip_pool = []
-    for ip in track(ip_pool_dns, description="ping [blue]{}[/blue]".format(domain),):
+    for ip in track(ip_pool_dns, description="ping [yellow]{}[/yellow]".format(domain), ):
         try:
             if is_ipv4(ip) or is_ipv6(ip):
                 pass
@@ -190,9 +189,9 @@ def dns_query_all(domain, all_save: bool = False) -> list:
 
 
 def update_domain(domain, hosts: Hosts, all_save: bool = False):
-    console.print("update domain hosts [blue]{}[/blue] ......".format(domain))
+    console.print("update domain hosts [yellow]{}[/yellow] ......".format(domain))
     dns_rewrite_update(hosts, domain, dns_query_all(domain, all_save))
-    console.print("update domain hosts [blue]{}[/blue] finished".format(domain))
+    console.print("update domain hosts [yellow]{}[/yellow] finished".format(domain))
 
 
 def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
@@ -240,7 +239,7 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
     domain_list = list(set(domain_list))
 
     print(
-        "will check and update domains: [blue]{}[/blue] [y/N]".format(
+        "will check and update domains: [yellow]{}[/yellow] [y/N]".format(
             " ".join(domain_list)
         ),
         end=":",
