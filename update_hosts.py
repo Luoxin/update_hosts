@@ -9,7 +9,6 @@ import requests
 import simplejson
 from cacheout import Cache
 from ping3 import ping
-from rich import print
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
@@ -41,9 +40,11 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
         )
     )
 
-    # for ip in tqdm(ip_list, ncols=100, desc="add hosts to cache {}".format(domain), ):
     for ip in track(
-            ip_list, description="add hosts to cache [yellow]{}[/yellow]".format(domain),
+            ip_list,
+            description="add hosts to cache [yellow]{}[/yellow]".format(domain),
+            console=console,
+            transient=True,
     ):
         if is_ipv4(ip):
             entry_type = "ipv4"
@@ -82,7 +83,7 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
                     elif t in [46]:
                         continue
                     else:
-                        print(answer)
+                        console.print(answer)
 
         else:
             resolver = dns.resolver.Resolver()
@@ -103,7 +104,7 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
                         continue
 
                     if not isinstance(j, dns.rdtypes.IN.A.A):
-                        print("j:{},type:{}".format(j, type(j)))
+                        console.print("j:{},type:{}".format(j, type(j)))
                         continue
 
                     if is_ipv4(ip) or is_ipv6(ip):
@@ -122,9 +123,8 @@ def dns_query(dns_server: str, domain: str) -> (list, list):
         pass
     except dns.resolver.NoAnswer:
         pass
-        # console.print("{} has not response".format(dns_server))
     except:
-        traceback.print_exc()
+        console.print_exception()
 
     return ip_list, cname_list
 
@@ -140,7 +140,10 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     cnames = []
 
     for dns_server in track(
-            dns_service_list, description="dns query [yellow]{}[/yellow]".format(domain)
+            dns_service_list,
+            description="dns query [yellow]{}[/yellow]".format(domain),
+            console=console,
+            transient=True,
     ):
         ip_list, cname_list = dns_query(dns_server, domain)
         ip_pool_dns.extend(ip_list)
@@ -153,7 +156,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
 
     ip_pool_dns = set(ip_pool_dns)
 
-    print(
+    console.print(
         "will ping [yellow]{}[/yellow]([green]{}[/green])".format(
             domain, ",".join(ip_pool_dns)
         )
@@ -162,12 +165,17 @@ def dns_query_all(domain, all_save: bool = False) -> list:
     min_delay = None
     min_delay_ip = None
     ip_pool = []
-    for ip in track(ip_pool_dns, description="ping [yellow]{}[/yellow]".format(domain), ):
+    for ip in track(
+            ip_pool_dns,
+            description="ping [yellow]{}[/yellow]".format(domain),
+            console=console,
+            transient=True,
+    ):
         try:
             if is_ipv4(ip) or is_ipv6(ip):
                 pass
             else:
-                print("{} type is err".format(ip))
+                console.print("{} type is err".format(ip))
                 continue
 
             delay = ping(ip, unit="ms", timeout=5)
@@ -179,7 +187,7 @@ def dns_query_all(domain, all_save: bool = False) -> list:
         except OSError:
             pass
         except:
-            traceback.print_exc()
+            console.print_exception()
 
     if not all_save and min_delay_ip is not None:
         ip_pool.append(min_delay_ip)
@@ -229,16 +237,16 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
     if isinstance(domain_list, str):
         domain_list = domain_list.replace(" ", "").split(",")
         if len(domain_list) == 0:
-            print("[red]can not find domains[/red]")
+            console.print("[red]can not find domains[/red]")
             return
     elif isinstance(domain_list, (list, tuple, set)):
         pass
     else:
-        print("[red]invalid domain_list[/red]")
+        console.print("[red]invalid domain_list[/red]")
 
     domain_list = list(set(domain_list))
 
-    print(
+    console.print(
         "will check and update domains: [yellow]{}[/yellow] [y/N]".format(
             " ".join(domain_list)
         ),
@@ -250,19 +258,19 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
         if y.lower() != "y":
             return
     else:
-        print()
+        console.print()
 
     hosts = get_hosts(hosts_path)
     if hosts is None:
         return
 
-    with ThreadPoolExecutor(max_workers=2) as t:
+    with ThreadPoolExecutor(max_workers=5) as t:
         all_task = [
             t.submit(update_domain, domain=domain, hosts=hosts, all_save=a)
             for domain in domain_list
         ]
         wait(all_task, return_when=ALL_COMPLETED)
-        print("all domain update finish")
+        console.print("all domain update finish")
 
     hosts.write()
 
