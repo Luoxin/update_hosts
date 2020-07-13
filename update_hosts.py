@@ -217,6 +217,12 @@ def update_dns(l=None, y: bool = False, a: bool = False, hosts_path: str = ""):
         domain_list = [
             "github.com",
             "api.github.com",
+            "support.github.com",
+            "githubstatus.com",
+            "polyfill.io",
+            "google-analytics.com",
+            "cloudfront.net",
+            "gstatic.com",
             "fonts.gstatic.com",
             "github.githubassets.com",
             "camo.githubusercontent.com",
