@@ -21,10 +21,108 @@ console = Console()
 
 cache = Cache()
 
+class UpdateHosts(object):
+    def __init__(self):
+        self.hosts_path = None
+        self.dns_cache = Cache()
+        self.ping_cache = Cache()
 
-def get_hosts(hosts_path=""):
-    return Hosts(path=hosts_path)
+    def get_hosts(self):
+        return Hosts(path=self.hosts_path)
 
+    def dns_query(self, dns_server: str, domain) -> (list, list):
+        def gen_key() -> str:
+            return "{}_{}".format(dns_server, domain)
+
+        dns_cache = self.dns_cache.get(gen_key(), default=None)
+        if dns_cache is not None:
+            return dns_cache
+
+        ip_list = []
+        cname_list = []
+        try:
+            if dns_server.startswith("http"):
+                ae = requests.get(
+                    dns_server,
+                    params={"name": domain, "type": "A", "ct": "application/dns-json"},
+                    timeout=5,
+                ).json()
+
+                if isinstance(ae.get("Answer"), (list, set, tuple)):
+                    for answer in ae.get("Answer"):
+                        t = answer.get("type")
+                        if t == 1:
+                            ip_list.append(str(answer.get("data")))
+                        elif t == 5:
+                            cname_list.append(str(answer.get("data")))
+                        elif t in [46]:
+                            continue
+                        else:
+                            console.print(answer)
+
+            else:
+                resolver = dns.resolver.Resolver()
+                resolver.nameservers = [dns_server]
+
+                A = resolver.query(domain, lifetime=5, rdtype=dns.rdatatype.A)
+
+                for i in A.response.answer:
+                    for j in i.items:
+                        ip = j.__str__()
+
+                        if isinstance(j, dns.rdtypes.nsbase.NSBase):
+                            cname_list.append(ip)
+                            continue
+
+                        if isinstance(j, dns.rdtypes.ANY.RRSIG.RRSIG):
+                            # TODO
+                            continue
+
+                        if not isinstance(j, dns.rdtypes.IN.A.A):
+                            console.print("j:{},type:{}".format(j, type(j)))
+                            continue
+
+                        if is_ipv4(ip) or is_ipv6(ip):
+                            pass
+                        else:
+                            continue
+                        ip_list.append(ip)
+        except (
+                dns.exception.Timeout,
+                dns.resolver.NoNameservers,
+                dns.resolver.NXDOMAIN,
+                requests.exceptions.Timeout,
+                simplejson.errors.JSONDecodeError,
+                requests.exceptions.ConnectionError,
+        ):
+            pass
+        except dns.resolver.NoAnswer:
+            pass
+        except:
+            console.print_exception()
+
+        return ip_list, cname_list
+
+    def ping(self, ip) -> float:
+        ping_cache = self.ping_cache.get(ip)
+        if ping_cache is not None and isinstance(ping_cache, (int, float)) and ping_cache > 0:
+            return ping_cache
+
+        try:
+            if is_ipv4(ip) or is_ipv6(ip):
+                pass
+            else:
+                console.print("{} type is err".format(ip))
+
+            delay = ping(ip, unit="ms", timeout=5)
+            self.ping_cache.set(delay)
+        except OSError:
+            self.ping_cache.set(-1)
+        except:
+            console.print_exception()
+            self.ping_cache.set(-1)
+
+        self.ping_cache.get(ip)
 
 def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     if len(ip_list) == 0:
@@ -60,73 +158,6 @@ def dns_rewrite_update(hosts: Hosts, domain, ip_list: (list, set) = None):
     else:
         console.print("not query ip for domain [red]{}[/red]".format(domain))
         return
-
-
-def dns_query(dns_server: str, domain: str) -> (list, list):
-    ip_list = []
-    cname_list = []
-    try:
-        if dns_server.startswith("http"):
-            ae = requests.get(
-                dns_server,
-                params={"name": domain, "type": "A", "ct": "application/dns-json"},
-                timeout=5,
-            ).json()
-
-            if isinstance(ae.get("Answer"), (list, set, tuple)):
-                for answer in ae.get("Answer"):
-                    t = answer.get("type")
-                    if t == 1:
-                        ip_list.append(str(answer.get("data")))
-                    elif t == 5:
-                        cname_list.append(str(answer.get("data")))
-                    elif t in [46]:
-                        continue
-                    else:
-                        console.print(answer)
-
-        else:
-            resolver = dns.resolver.Resolver()
-            resolver.nameservers = [dns_server]
-
-            A = resolver.query(domain, lifetime=5, rdtype=dns.rdatatype.A)
-
-            for i in A.response.answer:
-                for j in i.items:
-                    ip = j.__str__()
-
-                    if isinstance(j, dns.rdtypes.nsbase.NSBase):
-                        cname_list.append(ip)
-                        continue
-
-                    if isinstance(j, dns.rdtypes.ANY.RRSIG.RRSIG):
-                        # TODO
-                        continue
-
-                    if not isinstance(j, dns.rdtypes.IN.A.A):
-                        console.print("j:{},type:{}".format(j, type(j)))
-                        continue
-
-                    if is_ipv4(ip) or is_ipv6(ip):
-                        pass
-                    else:
-                        continue
-                    ip_list.append(ip)
-    except (
-        dns.exception.Timeout,
-        dns.resolver.NoNameservers,
-        dns.resolver.NXDOMAIN,
-        requests.exceptions.Timeout,
-        simplejson.errors.JSONDecodeError,
-        requests.exceptions.ConnectionError,
-    ):
-        pass
-    except dns.resolver.NoAnswer:
-        pass
-    except:
-        console.print_exception()
-
-    return ip_list, cname_list
 
 
 def dns_query_all(domain, all_save: bool = False) -> list:
