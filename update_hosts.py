@@ -144,12 +144,12 @@ class UpdateHosts(object):
                             continue
                         ip_list.append(ip)
         except (
-                dns.exception.Timeout,
-                dns.resolver.NoNameservers,
-                dns.resolver.NXDOMAIN,
-                requests.exceptions.Timeout,
-                simplejson.errors.JSONDecodeError,
-                requests.exceptions.ConnectionError,
+            dns.exception.Timeout,
+            dns.resolver.NoNameservers,
+            dns.resolver.NXDOMAIN,
+            requests.exceptions.Timeout,
+            simplejson.errors.JSONDecodeError,
+            requests.exceptions.ConnectionError,
         ):
             pass
         except dns.resolver.NoAnswer:
@@ -162,9 +162,9 @@ class UpdateHosts(object):
     def ping(self, ip) -> float:
         ping_cache = self.ping_cache.get(ip)
         if (
-                ping_cache is not None
-                and isinstance(ping_cache, (int, float))
-                and ping_cache > 0
+            ping_cache is not None
+            and isinstance(ping_cache, (int, float))
+            and ping_cache > 0
         ):
             return ping_cache
 
@@ -188,10 +188,10 @@ class UpdateHosts(object):
         min_delay = None
         fastest_ip = None
         for ip in track(
-                ip_list,
-                description="ping for [yellow]{}[/yellow]".format(domain),
-                console=console,
-                transient=True,
+            ip_list,
+            description="ping for [yellow]{}[/yellow]".format(domain),
+            console=console,
+            transient=True,
         ):
             try:
                 delay = self.ping(ip)
@@ -217,10 +217,10 @@ class UpdateHosts(object):
         ip_pool_dns = []
 
         for dns_server in track(
-                dns_service_list,
-                description="dns query [yellow]{}[/yellow]".format(domain),
-                console=console,
-                transient=True,
+            dns_service_list,
+            description="dns query [yellow]{}[/yellow]".format(domain),
+            console=console,
+            transient=True,
         ):
             ip_list, cname_list = self.dns_query(dns_server, domain)
             ip_pool_dns.extend(ip_list)
@@ -266,7 +266,7 @@ class UpdateHosts(object):
 
         hosts.remove_all_matching(name=domain)
         hosts.add(
-            [HostsEntry(entry_type=entry_type, address=fastest_ip, names=[domain]), ]
+            [HostsEntry(entry_type=entry_type, address=fastest_ip, names=[domain]),]
         )
 
         console.print("update domain hosts [yellow]{}[/yellow] finished".format(domain))
