@@ -1,8 +1,9 @@
-import os
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait, ALL_COMPLETED
 from enum import Enum, unique
+
 import dns.rdtypes.ANY.RRSIG
 import dns.rdtypes.nsbase
 import dns.resolver
@@ -10,25 +11,15 @@ import fire
 import requests
 import simplejson
 from cacheout import Cache
+from faker import Faker
 from ping3 import ping
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
-from faker import Faker
+
 from dns_list import dns_service_list
 from hosts import Hosts, HostsEntry
 from utils import is_ipv4, is_ipv6, is_internal_ip
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    TextColumn,
-    TransferSpeedColumn,
-    TimeRemainingColumn,
-    Progress,
-    TaskID,
-)
-
-from concurrent.futures import ThreadPoolExecutor
 
 console = Console()
 f = Faker()
@@ -132,7 +123,7 @@ class UpdateHosts(object):
                 ae = requests.get(
                     dns_server,
                     params={"name": domain, "type": "A", "ct": "application/dns-json"},
-                    timeout=5,
+                    timeout=60,
                 ).json()
 
                 if isinstance(ae.get("Answer"), (list, set, tuple)):
@@ -151,7 +142,7 @@ class UpdateHosts(object):
                 resolver = dns.resolver.Resolver()
                 resolver.nameservers = [dns_server]
 
-                A = resolver.query(domain, lifetime=5, rdtype=dns.rdatatype.A)
+                A = resolver.query(domain, lifetime=60, rdtype=dns.rdatatype.A)
 
                 for i in A.response.answer:
                     for j in i.items:
@@ -210,7 +201,7 @@ class UpdateHosts(object):
                 else:
                     console.print("{} type is err".format(ip))
 
-                delay = ping(ip, unit="ms", timeout=5)
+                delay = ping(ip, unit="ms", timeout=60)
                 self.check_cache.set(ip, delay)
             except OSError:
                 self.check_cache.set(ip, -1)
