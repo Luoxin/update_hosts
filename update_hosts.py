@@ -123,7 +123,7 @@ class UpdateHosts(object):
                 ae = requests.get(
                     dns_server,
                     params={"name": domain, "type": "A", "ct": "application/dns-json"},
-                    timeout=60,
+                    timeout=30,
                 ).json()
 
                 if isinstance(ae.get("Answer"), (list, set, tuple)):
@@ -142,7 +142,7 @@ class UpdateHosts(object):
                 resolver = dns.resolver.Resolver()
                 resolver.nameservers = [dns_server]
 
-                A = resolver.query(domain, lifetime=60, rdtype=dns.rdatatype.A)
+                A = resolver.query(domain, lifetime=30, rdtype=dns.rdatatype.A)
 
                 for i in A.response.answer:
                     for j in i.items:
@@ -201,7 +201,7 @@ class UpdateHosts(object):
                 else:
                     console.print("{} type is err".format(ip))
 
-                delay = ping(ip, unit="ms", timeout=60)
+                delay = ping(ip, unit="ms", timeout=30)
                 self.check_cache.set(ip, delay)
             except OSError:
                 self.check_cache.set(ip, -1)
@@ -216,7 +216,7 @@ class UpdateHosts(object):
                 start_time = time.time()
                 r = requests.get(
                     url="http://{}".format(ip),
-                    timeout=60,
+                    timeout=30,
                     headers={"Connection": "close", "User-Agent": f.user_agent()},
                 )
                 request_time = time.time() - start_time
