@@ -1,6 +1,8 @@
-import traceback
+import os
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
-
+from enum import Enum, unique
 import dns.rdtypes.ANY.RRSIG
 import dns.rdtypes.nsbase
 import dns.resolver
@@ -12,14 +14,31 @@ from ping3 import ping
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
-
+from faker import Faker
 from dns_list import dns_service_list
 from hosts import Hosts, HostsEntry
-from utils import is_ipv4, is_ipv6
+from utils import is_ipv4, is_ipv6, is_internal_ip
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    TextColumn,
+    TransferSpeedColumn,
+    TimeRemainingColumn,
+    Progress,
+    TaskID,
+)
+
+from concurrent.futures import ThreadPoolExecutor
 
 console = Console()
+f = Faker()
 
-cache = Cache()
+
+@unique
+class CheckType(Enum):
+    Ping = 1
+    HttpDelayed = 2
+    HttpSpeed = 3
 
 
 class UpdateHosts(object):
@@ -49,19 +68,31 @@ class UpdateHosts(object):
         "avatars5.githubusercontent.com",
     ]
 
-    __slots__ = ["hosts_path", "dns_cache", "ping_cache", "domain_list", "max_workers"]
+    __slots__ = [
+        "hosts_path",
+        "dns_cache",
+        "check_cache",
+        "domain_list",
+        "max_workers",
+        "check_type",
+    ]
 
     def __init__(self):
         self.hosts_path = None
         self.max_workers = 5
 
         self.dns_cache = Cache()
-        self.ping_cache = Cache()
+        self.check_cache = Cache()
 
         self.domain_list = self._domain_list
 
+        self.check_type = CheckType.Ping
+
     def get_hosts(self):
         return Hosts(path=self.hosts_path)
+
+    def set_check_type(self, t: CheckType):
+        self.check_type = t
 
     def set_hosts_path(self, hosts_path: str = None):
         self.hosts_path = hosts_path
@@ -157,44 +188,81 @@ class UpdateHosts(object):
         except:
             console.print_exception()
 
+        for ip in ip_list:
+            if is_internal_ip(ip):
+                ip_list.remove(ip)
+
         return ip_list, cname_list
 
-    def ping(self, ip) -> float:
-        ping_cache = self.ping_cache.get(ip)
+    def check(self, ip) -> float:
+        check_cache = self.check_cache.get(ip)
         if (
-            ping_cache is not None
-            and isinstance(ping_cache, (int, float))
-            and ping_cache > 0
+            check_cache is not None
+            and isinstance(check_cache, (int, float))
+            and check_cache > 0
         ):
-            return ping_cache
+            return check_cache
 
-        try:
-            if is_ipv4(ip) or is_ipv6(ip):
-                pass
-            else:
-                console.print("{} type is err".format(ip))
+        if self.check_type == CheckType.Ping:
+            try:
+                if is_ipv4(ip) or is_ipv6(ip):
+                    pass
+                else:
+                    console.print("{} type is err".format(ip))
 
-            delay = ping(ip, unit="ms", timeout=5)
-            self.ping_cache.set(ip, delay)
-        except OSError:
-            self.ping_cache.set(ip, -1)
-        except:
-            console.print_exception()
-            self.ping_cache.set(ip, -1)
+                delay = ping(ip, unit="ms", timeout=5)
+                self.check_cache.set(ip, delay)
+            except OSError:
+                self.check_cache.set(ip, -1)
+            except:
+                console.print_exception()
+                self.check_cache.set(ip, -1)
+        elif (
+            self.check_type == CheckType.HttpDelayed
+            or self.check_type == CheckType.HttpSpeed
+        ):
+            try:
+                start_time = time.time()
+                r = requests.get(
+                    url="http://{}".format(ip),
+                    timeout=60,
+                    headers={"Connection": "close", "User-Agent": f.user_agent()},
+                )
+                request_time = time.time() - start_time
+                del start_time
+                size = sys.getsizeof(r.content) / 1024
+                network_delay = r.elapsed.microseconds / 1000 / 1000
+                speed = size / (request_time - network_delay)
+                r.close()
+                del r
 
-        self.ping_cache.get(ip)
+                if self.check_type == CheckType.HttpDelayed:
+                    self.check_cache.set(ip, network_delay)
+                elif self.check_type == CheckType.HttpSpeed:
+                    self.check_cache.set(ip, speed)
 
-    def ping_all(self, domain: str, ip_list: (set, tuple, list)):
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                self.check_cache.set(ip, -1)
+            except:
+                console.print_exception()
+                self.check_cache.set(ip, -1)
+        else:
+            console.print("invalid type", style="red")
+            self.check_cache.set(ip, -1)
+
+        self.check_cache.get(ip)
+
+    def check_all(self, domain: str, ip_list: (set, tuple, list)):
         min_delay = None
         fastest_ip = None
         for ip in track(
             ip_list,
-            description="ping for [yellow]{}[/yellow]".format(domain),
+            description="check connectivity for [yellow]{}[/yellow]".format(domain),
             console=console,
             transient=True,
         ):
             try:
-                delay = self.ping(ip)
+                delay = self.check(ip)
 
                 if delay is not None and (min_delay is None or min_delay > delay):
                     min_delay = delay
@@ -215,6 +283,8 @@ class UpdateHosts(object):
             return dns_cache
 
         ip_pool_dns = []
+
+        console.print("will query dns [yellow]{}[/yellow]".format(domain))
 
         for dns_server in track(
             dns_service_list,
@@ -241,12 +311,12 @@ class UpdateHosts(object):
             return
 
         console.print(
-            "will ping [yellow]{}[/yellow]([green]{}[/green])".format(
+            "will check connectivity [yellow]{}[/yellow]([green]{}[/green])".format(
                 domain, ",".join(ip_list)
             )
         )
 
-        fastest_ip = self.ping_all(domain, ip_list)
+        fastest_ip = self.check_all(domain, ip_list)
         if fastest_ip is None:
             console.print("not query ip for domain [red]{}[/red]".format(domain))
             return
@@ -275,10 +345,10 @@ class UpdateHosts(object):
         self.set_domain(domain_list)
 
         console.print(
-            "will check and update domains: [yellow]{}[/yellow] [y/N]".format(
+            "will check and update domains: [yellow]{}[/yellow] [[y/N]".format(
                 " ".join(self.domain_list)
             ),
-            end=":",
+            end=": ",
         )
 
         if not agree:
@@ -300,6 +370,20 @@ class UpdateHosts(object):
             wait(all_task, return_when=ALL_COMPLETED)
             console.print("all domain update finish")
 
+        # with Progress(
+        #     TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
+        #     BarColumn(bar_width=None),
+        #     "[progress.percentage]{task.percentage:>3.1f}%",
+        #     "•",
+        #     DownloadColumn(),
+        #     "•",
+        #     TransferSpeedColumn(),
+        #     "•",
+        #     TimeRemainingColumn(),
+        # ) as progress:
+        #     with ThreadPoolExecutor(max_workers=4) as pool:
+        #         for domain in self.domain_list:
+
         hosts.write()
 
         table = Table(title="Hosts File", show_header=True, header_style="bold magenta")
@@ -313,10 +397,36 @@ class UpdateHosts(object):
         console.print(table)
 
 
-def update_dns(l=None, y: bool = False, hosts_path: str = "", max_works: int = 5):
+def update_dns(l=None, y: bool = False, p: str = "", c: str = None, m: int = 5):
+    """
+    update dns
+    :param l: need check domain list
+    :param y: is agree
+    :param p: hosts file path
+    :param c: check type, is not input will use ping
+        check type:
+            ping: ping
+            hd: http delay
+            hs: http speed
+    :param m: max works
+    :return:
+    """
     u = UpdateHosts()
-    u.set_hosts_path(hosts_path)
-    u.set_max_workers(max_works)
+    u.set_hosts_path(p)
+    u.set_max_workers(m)
+
+    if c is None or c == "":
+        pass
+    elif c == "ping":
+        u.set_check_type(CheckType.Ping)
+    elif c == "hd":
+        u.set_check_type(CheckType.HttpDelayed)
+    elif c == "hs":
+        u.set_check_type(CheckType.HttpSpeed)
+    else:
+        console.print("invalid check type({})".format(c), style="red")
+        return
+
     u.update_dns(domain_list=l, agree=y)
 
 
