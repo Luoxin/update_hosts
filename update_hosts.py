@@ -1,44 +1,24 @@
-import os
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait, ALL_COMPLETED
 from enum import Enum, unique
-import dns.rdtypes.ANY.RRSIG
-import dns.rdtypes.nsbase
-import dns.resolver
+
 import fire
 import requests
-import simplejson
 from cacheout import Cache
+from faker import Faker
 from ping3 import ping
-from rich.console import Console
 from rich.progress import track
 from rich.table import Table
-from faker import Faker
+
+from console import console
 from dns_list import dns_service_list
 from hosts import Hosts, HostsEntry
-from utils import is_ipv4, is_ipv6, is_internal_ip
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    TextColumn,
-    TransferSpeedColumn,
-    TimeRemainingColumn,
-    Progress,
-    TaskID,
-)
+from lock import new_lock, acquire
+from utils import is_ipv4, is_ipv6
 
-from concurrent.futures import ThreadPoolExecutor
-
-console = Console()
 f = Faker()
-
-
-@unique
-class CheckType(Enum):
-    Ping = 1
-    HttpDelayed = 2
-    HttpSpeed = 3
 
 
 class UpdateHosts(object):
@@ -75,24 +55,20 @@ class UpdateHosts(object):
         "domain_list",
         "max_workers",
         "check_type",
+        "dns_query_cache",
+        "dns_lock",
+        "check_query_cache",
+        "check_lock",
     ]
 
     def __init__(self):
         self.hosts_path = None
         self.max_workers = 5
 
-        self.dns_cache = Cache()
-        self.check_cache = Cache()
-
         self.domain_list = self._domain_list
-
-        self.check_type = CheckType.Ping
 
     def get_hosts(self):
         return Hosts(path=self.hosts_path)
-
-    def set_check_type(self, t: CheckType):
-        self.check_type = t
 
     def set_hosts_path(self, hosts_path: str = None):
         self.hosts_path = hosts_path
@@ -116,141 +92,6 @@ class UpdateHosts(object):
             self.domain_list = domain_list
 
         self.domain_list = list(set(self.domain_list))
-
-    def dns_query(self, dns_server: str, domain: str) -> (list, list):
-        def gen_key() -> str:
-            return "{}_{}".format(dns_server, domain)
-
-        dns_cache = self.dns_cache.get(gen_key(), default=None)
-        if dns_cache is not None:
-            return dns_cache
-
-        ip_list = []
-        cname_list = []
-        try:
-            if dns_server.startswith("http"):
-                ae = requests.get(
-                    dns_server,
-                    params={"name": domain, "type": "A", "ct": "application/dns-json"},
-                    timeout=5,
-                ).json()
-
-                if isinstance(ae.get("Answer"), (list, set, tuple)):
-                    for answer in ae.get("Answer"):
-                        t = answer.get("type")
-                        if t == 1:
-                            ip_list.append(str(answer.get("data")))
-                        elif t == 5:
-                            cname_list.append(str(answer.get("data")))
-                        elif t in [46]:
-                            continue
-                        else:
-                            console.print(answer)
-
-            else:
-                resolver = dns.resolver.Resolver()
-                resolver.nameservers = [dns_server]
-
-                A = resolver.query(domain, lifetime=5, rdtype=dns.rdatatype.A)
-
-                for i in A.response.answer:
-                    for j in i.items:
-                        ip = j.__str__()
-
-                        if isinstance(j, dns.rdtypes.nsbase.NSBase):
-                            cname_list.append(ip)
-                            continue
-
-                        if isinstance(j, dns.rdtypes.ANY.RRSIG.RRSIG):
-                            # TODO
-                            continue
-
-                        if not isinstance(j, dns.rdtypes.IN.A.A):
-                            console.print("j:{},type:{}".format(j, type(j)))
-                            continue
-
-                        if is_ipv4(ip) or is_ipv6(ip):
-                            pass
-                        else:
-                            continue
-                        ip_list.append(ip)
-        except (
-            dns.exception.Timeout,
-            dns.resolver.NoNameservers,
-            dns.resolver.NXDOMAIN,
-            requests.exceptions.Timeout,
-            simplejson.errors.JSONDecodeError,
-            requests.exceptions.ConnectionError,
-        ):
-            pass
-        except dns.resolver.NoAnswer:
-            pass
-        except:
-            console.print_exception()
-
-        for ip in ip_list:
-            if is_internal_ip(ip):
-                ip_list.remove(ip)
-
-        return ip_list, cname_list
-
-    def check(self, ip) -> float:
-        check_cache = self.check_cache.get(ip)
-        if (
-            check_cache is not None
-            and isinstance(check_cache, (int, float))
-            and check_cache > 0
-        ):
-            return check_cache
-
-        if self.check_type == CheckType.Ping:
-            try:
-                if is_ipv4(ip) or is_ipv6(ip):
-                    pass
-                else:
-                    console.print("{} type is err".format(ip))
-
-                delay = ping(ip, unit="ms", timeout=5)
-                self.check_cache.set(ip, delay)
-            except OSError:
-                self.check_cache.set(ip, -1)
-            except:
-                console.print_exception()
-                self.check_cache.set(ip, -1)
-        elif (
-            self.check_type == CheckType.HttpDelayed
-            or self.check_type == CheckType.HttpSpeed
-        ):
-            try:
-                start_time = time.time()
-                r = requests.get(
-                    url="http://{}".format(ip),
-                    timeout=60,
-                    headers={"Connection": "close", "User-Agent": f.user_agent()},
-                )
-                request_time = time.time() - start_time
-                del start_time
-                size = sys.getsizeof(r.content) / 1024
-                network_delay = r.elapsed.microseconds / 1000 / 1000
-                speed = size / (request_time - network_delay)
-                r.close()
-                del r
-
-                if self.check_type == CheckType.HttpDelayed:
-                    self.check_cache.set(ip, network_delay)
-                elif self.check_type == CheckType.HttpSpeed:
-                    self.check_cache.set(ip, speed)
-
-            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-                self.check_cache.set(ip, -1)
-            except:
-                console.print_exception()
-                self.check_cache.set(ip, -1)
-        else:
-            console.print("invalid type", style="red")
-            self.check_cache.set(ip, -1)
-
-        self.check_cache.get(ip)
 
     def check_all(self, domain: str, ip_list: (set, tuple, list)):
         min_delay = None
@@ -428,26 +269,6 @@ def update_dns(l=None, y: bool = False, p: str = "", c: str = None, m: int = 5):
         return
 
     u.update_dns(domain_list=l, agree=y)
-
-
-# def update_from_hosts(hosts_path: str = "", y: bool = False, a: bool = False):
-#     """
-#     update hosts from hosts
-#     :param y: agree
-#     :param a: all host write in hosts
-#     :param hosts_path: hosts file path,if not input will use default path
-#     :return:
-#     """
-#     hosts = get_hosts(hosts_path)
-#     if hosts is None:
-#         return
-#
-#     domain_list = []
-#     for entry in hosts.entries:
-#         if len(entry.names) > 0:
-#             domain_list.extend(entry.names)
-#
-#     return update_dns(l=domain_list, y=y, a=a)
 
 
 if __name__ == "__main__":
