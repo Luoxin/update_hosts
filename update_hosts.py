@@ -24,6 +24,7 @@ from utils import is_ipv4, is_ipv6, is_internal_ip
 console = Console()
 f = Faker()
 
+# TODO 研究一下dnsyo看一下提交效率的事情
 
 @unique
 class CheckType(Enum):
