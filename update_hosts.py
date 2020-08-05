@@ -26,6 +26,7 @@ f = Faker()
 
 # TODO 研究一下dnsyo看一下提交效率的事情
 
+
 @unique
 class CheckType(Enum):
     Ping = 1
@@ -142,8 +143,10 @@ class UpdateHosts(object):
             else:
                 resolver = dns.resolver.Resolver()
                 resolver.nameservers = [dns_server]
+                resolver.timeout = 30
+                resolver.lifetime = 30
 
-                A = resolver.query(domain, lifetime=30, rdtype=dns.rdatatype.A)
+                A = resolver.query(domain, rdtype=dns.rdatatype.A)
 
                 for i in A.response.answer:
                     for j in i.items:
