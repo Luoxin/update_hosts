@@ -1,6 +1,6 @@
 ping3==2.6.5
 Faker==4.1.1
-requests==2.23.0
+requests==2.31.0
 cacheout==0.11.2
 simplejson==3.17.0
 fire==0.3.1
